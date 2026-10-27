@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Check that the files exist
+        run: |
+          test -f index.html || { echo "index.html is missing"; exit 1; }
+          test -f style.css  || { echo "style.css is missing"; exit 1; }
+          test -f Dockerfile || { echo "Dockerfile is missing"; exit 1; }
+
+      - name: Check the page content
+        run: |
+          grep -q '<title>' index.html   || { echo "No <title> in index.html"; exit 1; }
+          grep -q '001' index.html       || { echo "Roll number 001 not found"; exit 1; }
+          grep -q 'style.css' index.html || { echo "index.html does not link style.css"; exit 1; }
+          grep -q '</html>' index.html   || { echo "index.html is not closed with </html>"; exit 1; }
+          echo "All page checks passed"
+
+      - name: Log in to Docker Hub
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/devops-a2:latest
